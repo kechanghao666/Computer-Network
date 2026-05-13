@@ -12,7 +12,7 @@ from __future__ import annotations
 import socket
 import statistics
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Optional
 
 
@@ -55,6 +55,8 @@ class RttResult:
     avg_ms: Optional[float]
     network_status: str
     error: Optional[str] = None
+    record_id: Optional[int] = None
+    record_error: Optional[str] = None
 
 
 class CommunicationError(RuntimeError):
@@ -69,10 +71,14 @@ class AtmCommunication:
         host: str = DEFAULT_HOST,
         port: int = DEFAULT_PORT,
         timeout: float = DEFAULT_TIMEOUT,
+        record_rtt: bool = True,
+        rtt_db_path: str | None = None,
     ) -> None:
         self.host = host
         self.port = port
         self.timeout = timeout
+        self.record_rtt = record_rtt
+        self.rtt_db_path = rtt_db_path
         self._socket: Optional[socket.socket] = None
         self._recv_buffer = ""
 
@@ -181,7 +187,7 @@ class AtmCommunication:
                 elapsed_ms = (time.perf_counter() - start) * 1000
 
                 if response.raw.upper() != "PONG":
-                    return RttResult(
+                    return self._record_rtt_result(RttResult(
                         success=False,
                         count=len(values),
                         values=values,
@@ -190,11 +196,11 @@ class AtmCommunication:
                         avg_ms=statistics.mean(values) if values else None,
                         network_status="测试失败",
                         error=response.raw,
-                    )
+                    ))
 
                 values.append(elapsed_ms)
         except CommunicationError as exc:
-            return RttResult(
+            return self._record_rtt_result(RttResult(
                 success=False,
                 count=len(values),
                 values=values,
@@ -203,10 +209,10 @@ class AtmCommunication:
                 avg_ms=statistics.mean(values) if values else None,
                 network_status="连接异常",
                 error=str(exc),
-            )
+            ))
 
         avg_ms = statistics.mean(values)
-        return RttResult(
+        return self._record_rtt_result(RttResult(
             success=True,
             count=len(values),
             values=values,
@@ -214,7 +220,7 @@ class AtmCommunication:
             max_ms=max(values),
             avg_ms=avg_ms,
             network_status=classify_network(avg_ms),
-        )
+        ))
 
     def quit_system(self) -> AtmResponse:
         """通知服务器退出系统，并关闭客户端连接。"""
@@ -238,6 +244,33 @@ class AtmCommunication:
         if self._socket is None:
             raise CommunicationError("尚未连接服务器")
         return self._socket
+
+    def _record_rtt_result(self, result: RttResult) -> RttResult:
+        """Best-effort RTT persistence; logging errors do not break RTT testing."""
+        if not self.record_rtt:
+            return result
+        try:
+            from database.account_service import record_rtt_result
+
+            kwargs = {}
+            if self.rtt_db_path is not None:
+                kwargs["db_path"] = self.rtt_db_path
+            record_id = record_rtt_result(
+                host=self.host,
+                port=self.port,
+                count=result.count,
+                values=result.values,
+                min_ms=result.min_ms,
+                max_ms=result.max_ms,
+                avg_ms=result.avg_ms,
+                network_status=result.network_status,
+                success=result.success,
+                error=result.error,
+                **kwargs,
+            )
+            return replace(result, record_id=record_id)
+        except Exception as exc:
+            return replace(result, record_error=str(exc))
 
     def _receive_line(self) -> str:
         client_socket = self._require_socket()

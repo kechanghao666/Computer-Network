@@ -113,3 +113,24 @@ python -m unittest discover -s test -v
 ```text
 docs/configuration_usage.md
 ```
+
+## Graphical UI, SMTP Check, RTT Export
+
+Graphical client:
+
+```powershell
+python client\gui_client.py
+```
+
+SMTP configuration check and real test email:
+
+```powershell
+python -m email_service.smtp_email --check
+python -m email_service.smtp_email --to your@qq.com
+```
+
+RTT test results are saved in SQLite table `rtt_record`. Export records to CSV:
+
+```powershell
+python -c "from database.account_service import export_rtt_records_csv; export_rtt_records_csv('rtt_records.csv')"
+```

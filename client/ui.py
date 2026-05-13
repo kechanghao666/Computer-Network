@@ -131,6 +131,12 @@ def display_rtt_result(result: Any) -> None:
     print(f"Max RTT : {getattr(result, 'max_ms', 0):.2f} ms")
     print(f"Avg RTT : {getattr(result, 'avg_ms', 0):.2f} ms")
     print(f"Status  : {getattr(result, 'network_status', '')}")
+    record_id = getattr(result, "record_id", None)
+    if record_id is not None:
+        print(f"Record  : RTT database record #{record_id}")
+    record_error = getattr(result, "record_error", None)
+    if record_error:
+        print(f"Record  : failed to save RTT result ({record_error})")
 
 
 def display_money(label: str, amount: float) -> None:
@@ -194,4 +200,3 @@ def run_app(
             print(f"[ERROR] {exc}")
 
         wait_return(input_func, pause)
-

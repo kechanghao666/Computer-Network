@@ -1,6 +1,8 @@
 import socketserver
+import tempfile
 import threading
 import unittest
+from pathlib import Path
 
 from client.communication import (
     AtmCommunication,
@@ -74,7 +76,7 @@ class CommunicationTestCase(unittest.TestCase):
         cls.thread.join(timeout=2)
 
     def setUp(self):
-        self.client = AtmCommunication(self.host, self.port, timeout=1)
+        self.client = AtmCommunication(self.host, self.port, timeout=1, record_rtt=False)
         self.client.connect_server()
 
     def tearDown(self):
@@ -129,12 +131,32 @@ class CommunicationTestCase(unittest.TestCase):
         self.assertIsNotNone(result.max_ms)
         self.assertIsNotNone(result.avg_ms)
 
+    def test_rtt_persists_record_when_enabled(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            db_path = Path(temp_dir) / "atm.db"
+            client = AtmCommunication(
+                self.host,
+                self.port,
+                timeout=1,
+                record_rtt=True,
+                rtt_db_path=str(db_path),
+            )
+            client.connect_server()
+            try:
+                result = client.test_rtt(count=5)
+            finally:
+                client.close_connection()
+
+            self.assertTrue(result.success)
+            self.assertIsNotNone(result.record_id)
+            self.assertIsNone(result.record_error)
+
     def test_rtt_rejects_non_pong_success_response(self):
         class BadPongClient(AtmCommunication):
             def request(self, request_text):
                 return parse_response("200 OK Not pong")
 
-        result = BadPongClient().test_rtt(count=5)
+        result = BadPongClient(record_rtt=False).test_rtt(count=5)
 
         self.assertFalse(result.success)
         self.assertEqual(result.count, 0)
@@ -146,7 +168,7 @@ class CommunicationTestCase(unittest.TestCase):
         self.assertFalse(self.client.is_connected)
 
     def test_connect_failed(self):
-        bad_client = AtmCommunication("127.0.0.1", 1, timeout=0.1)
+        bad_client = AtmCommunication("127.0.0.1", 1, timeout=0.1, record_rtt=False)
         with self.assertRaises(CommunicationError):
             bad_client.connect_server()
 

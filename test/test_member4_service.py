@@ -11,10 +11,13 @@ from database.account_service import (
     get_balance,
     get_email,
     get_flow,
+    get_rtt_records,
     init_database,
+    export_rtt_records_csv,
+    record_rtt_result,
     withdraw_money,
 )
-from email_service.smtp_email import send_email
+from email_service.smtp_email import get_smtp_config_status, send_email, send_test_email
 
 
 class RecordingEmailSender:
@@ -118,6 +121,27 @@ class Member4ServiceTest(unittest.TestCase):
         self.assertEqual(flows[-1]["amount"], 0.0)
         self.assertEqual(flows[-1]["balance_after"], 4900.0)
 
+    def test_rtt_records_can_be_saved_and_exported(self):
+        record_id = record_rtt_result(
+            host="127.0.0.1",
+            port=8888,
+            count=5,
+            values=[1, 2, 3, 4, 5],
+            min_ms=1,
+            max_ms=5,
+            avg_ms=3,
+            network_status="网络状态优秀",
+            db_path=self.db_path,
+        )
+
+        records = get_rtt_records(limit=10, db_path=self.db_path)
+        self.assertEqual(records[0]["id"], record_id)
+        self.assertEqual(records[0]["values"], [1.0, 2.0, 3.0, 4.0, 5.0])
+
+        csv_path = Path(self.temp_dir.name) / "rtt.csv"
+        export_rtt_records_csv(csv_path, db_path=self.db_path)
+        self.assertIn("avg_ms", csv_path.read_text(encoding="utf-8-sig"))
+
     def test_send_email_uses_injected_sender(self):
         sender = RecordingEmailSender()
 
@@ -150,6 +174,33 @@ class Member4ServiceTest(unittest.TestCase):
                 os.environ.pop("ATM_SMTP_PORT", None)
             else:
                 os.environ["ATM_SMTP_PORT"] = old_port
+
+    def test_smtp_config_status_reports_missing_items(self):
+        old_values = {key: os.environ.get(key) for key in (
+            "ATM_SMTP_HOST",
+            "ATM_SMTP_PORT",
+            "ATM_SMTP_USER",
+            "ATM_SMTP_PASSWORD",
+            "ATM_SMTP_FROM",
+        )}
+        for key in old_values:
+            os.environ.pop(key, None)
+        try:
+            status = get_smtp_config_status()
+            self.assertFalse(status["configured"])
+            self.assertIn("ATM_SMTP_HOST", status["missing"])
+            self.assertIn("ATM_SMTP_PASSWORD", status["missing"])
+        finally:
+            for key, value in old_values.items():
+                if value is not None:
+                    os.environ[key] = value
+
+    def test_send_test_email_uses_same_sender_path(self):
+        sender = RecordingEmailSender()
+
+        self.assertTrue(send_test_email("zhangsan@qq.com", sender=sender))
+        self.assertEqual(sender.messages[0][0], "zhangsan@qq.com")
+        self.assertEqual(sender.messages[0][1], "Bank ATM SMTP Test")
 
 
 if __name__ == "__main__":

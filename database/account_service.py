@@ -1,6 +1,9 @@
+import csv
+import json
 from datetime import datetime
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from contextlib import closing
+from pathlib import Path
 
 try:
     from .database import DEFAULT_DB_PATH, connect_database
@@ -42,6 +45,24 @@ def init_database(db_path=DEFAULT_DB_PATH):
                     balance_after REAL,
                     create_time TEXT,
                     remark TEXT
+                )
+                """
+            )
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS rtt_record (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    host TEXT NOT NULL,
+                    port INTEGER NOT NULL,
+                    test_count INTEGER NOT NULL,
+                    success INTEGER NOT NULL,
+                    min_ms REAL,
+                    max_ms REAL,
+                    avg_ms REAL,
+                    network_status TEXT,
+                    values_json TEXT,
+                    error TEXT,
+                    create_time TEXT
                 )
                 """
             )
@@ -216,6 +237,92 @@ def get_email(username, db_path=DEFAULT_DB_PATH):
     return row["email"]
 
 
+def record_rtt_result(
+    host,
+    port,
+    count,
+    values,
+    min_ms,
+    max_ms,
+    avg_ms,
+    network_status,
+    success=True,
+    error=None,
+    db_path=DEFAULT_DB_PATH,
+):
+    """保存一次 RTT 测试结果，供线路传输质量统计分析使用。"""
+    init_database(db_path)
+    clean_values = [float(value) for value in values]
+    with closing(connect_database(db_path)) as connection:
+        with connection:
+            cursor = connection.execute(
+                """
+                INSERT INTO rtt_record
+                    (host, port, test_count, success, min_ms, max_ms, avg_ms,
+                     network_status, values_json, error, create_time)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    str(host),
+                    int(port),
+                    int(count),
+                    1 if success else 0,
+                    None if min_ms is None else float(min_ms),
+                    None if max_ms is None else float(max_ms),
+                    None if avg_ms is None else float(avg_ms),
+                    network_status,
+                    json.dumps(clean_values, ensure_ascii=False),
+                    error,
+                    datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                ),
+            )
+            return cursor.lastrowid
+
+
+def get_rtt_records(limit=20, db_path=DEFAULT_DB_PATH):
+    """按时间倒序读取 RTT 测试记录。"""
+    init_database(db_path)
+    with closing(connect_database(db_path)) as connection:
+        rows = connection.execute(
+            """
+            SELECT id, host, port, test_count, success, min_ms, max_ms, avg_ms,
+                   network_status, values_json, error, create_time
+            FROM rtt_record
+            ORDER BY id DESC
+            LIMIT ?
+            """,
+            (int(limit),),
+        ).fetchall()
+    return [_rtt_to_dict(row) for row in rows]
+
+
+def export_rtt_records_csv(output_path, db_path=DEFAULT_DB_PATH, limit=1000):
+    """导出 RTT 测试记录为 CSV，便于统计分析和提交截图。"""
+    records = get_rtt_records(limit=limit, db_path=db_path)
+    path = Path(output_path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fieldnames = [
+        "id",
+        "host",
+        "port",
+        "test_count",
+        "success",
+        "min_ms",
+        "max_ms",
+        "avg_ms",
+        "network_status",
+        "values",
+        "error",
+        "create_time",
+    ]
+    with path.open("w", newline="", encoding="utf-8-sig") as file:
+        writer = csv.DictWriter(file, fieldnames=fieldnames)
+        writer.writeheader()
+        for record in records:
+            writer.writerow(record)
+    return path
+
+
 def _account_row(connection, username):
     return connection.execute(
         """
@@ -283,6 +390,23 @@ def _flow_to_dict(row):
         "balance_after": _float_money(row["balance_after"]),
         "create_time": row["create_time"],
         "remark": row["remark"],
+    }
+
+
+def _rtt_to_dict(row):
+    return {
+        "id": row["id"],
+        "host": row["host"],
+        "port": row["port"],
+        "test_count": row["test_count"],
+        "success": bool(row["success"]),
+        "min_ms": row["min_ms"],
+        "max_ms": row["max_ms"],
+        "avg_ms": row["avg_ms"],
+        "network_status": row["network_status"],
+        "values": json.loads(row["values_json"] or "[]"),
+        "error": row["error"],
+        "create_time": row["create_time"],
     }
 
 

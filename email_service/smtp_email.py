@@ -1,10 +1,13 @@
+from __future__ import annotations
+
+import argparse
 import os
 import smtplib
 from email.message import EmailMessage
 
 
 class SmtpEmailSender:
-    """SMTP 邮件发送器，配置从环境变量读取。"""
+    """SMTP email sender configured by environment variables."""
 
     def __init__(
         self,
@@ -17,15 +20,33 @@ class SmtpEmailSender:
         timeout=10,
     ):
         self.host = host or os.getenv("ATM_SMTP_HOST")
-        self.port = int(port or os.getenv("ATM_SMTP_PORT", "465"))
+        self.port_raw = str(port or os.getenv("ATM_SMTP_PORT", "465")).strip()
+        self.port = _parse_port(self.port_raw)
         self.username = username or os.getenv("ATM_SMTP_USER")
         self.password = password or os.getenv("ATM_SMTP_PASSWORD")
         self.from_email = from_email or os.getenv("ATM_SMTP_FROM") or self.username
         self.use_ssl = _env_bool("ATM_SMTP_SSL", True) if use_ssl is None else use_ssl
         self.timeout = timeout
 
+    def missing_config(self):
+        missing = []
+        if not self.host:
+            missing.append("ATM_SMTP_HOST")
+        if self.port is None:
+            missing.append("ATM_SMTP_PORT")
+        if not self.username:
+            missing.append("ATM_SMTP_USER")
+        if not self.password:
+            missing.append("ATM_SMTP_PASSWORD")
+        if not self.from_email:
+            missing.append("ATM_SMTP_FROM")
+        return missing
+
+    def is_configured(self):
+        return not self.missing_config()
+
     def send(self, to_email, subject, content):
-        if not all([self.host, self.port, self.username, self.password, self.from_email]):
+        if not to_email or not self.is_configured():
             return False
 
         message = EmailMessage()
@@ -46,8 +67,22 @@ class SmtpEmailSender:
         return True
 
 
+def get_smtp_config_status(sender=None):
+    email_sender = sender or SmtpEmailSender()
+    missing = email_sender.missing_config()
+    return {
+        "configured": not missing,
+        "missing": missing,
+        "host": email_sender.host,
+        "port": email_sender.port,
+        "username": email_sender.username,
+        "from_email": email_sender.from_email,
+        "use_ssl": email_sender.use_ssl,
+    }
+
+
 def send_email(to_email, subject, content, sender=None):
-    """发送邮件；发送失败返回 False，不影响存取款主流程。"""
+    """Send email by SMTP. Return False on configuration or delivery failure."""
     if not to_email:
         return False
     try:
@@ -57,8 +92,54 @@ def send_email(to_email, subject, content, sender=None):
         return False
 
 
+def send_test_email(to_email, sender=None):
+    subject = "Bank ATM SMTP Test"
+    content = (
+        "This is a Bank ATM SMTP test email.\n"
+        "If you receive this message, SMTP notification is configured correctly."
+    )
+    return send_email(to_email, subject, content, sender=sender)
+
+
+def _parse_port(value):
+    try:
+        port = int(value)
+    except (TypeError, ValueError):
+        return None
+    if port <= 0 or port > 65535:
+        return None
+    return port
+
+
 def _env_bool(name, default):
     value = os.getenv(name)
     if value is None:
         return default
     return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description="Bank ATM SMTP checker")
+    parser.add_argument("--check", action="store_true", help="show SMTP config status")
+    parser.add_argument("--to", help="recipient address for a real test email")
+    args = parser.parse_args(argv)
+
+    status = get_smtp_config_status()
+    if args.check or not args.to:
+        print("SMTP configured:", status["configured"])
+        print("Missing:", ", ".join(status["missing"]) if status["missing"] else "None")
+        print("Host:", status["host"])
+        print("Port:", status["port"])
+        print("User:", status["username"])
+        print("From:", status["from_email"])
+        print("SSL:", status["use_ssl"])
+        if not args.to:
+            return 0 if status["configured"] else 1
+
+    ok = send_test_email(args.to)
+    print("SMTP test email:", "sent" if ok else "failed")
+    return 0 if ok else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
