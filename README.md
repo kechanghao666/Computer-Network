@@ -1,655 +1,115 @@
-# 银行 ATM 自动取款系统
+# 银行 ATM 自动取款系统 - 成员1至成员4整合版
 
-## 1. 项目简介
+本目录已整合成员1至成员4的代码：
 
-本项目是一个银行 ATM 自动取款系统课程设计项目，采用客户端 / 服务器架构，模拟银行 ATM 客户端与银行中央服务器之间的通信过程。
+- 成员1：ATM 客户端界面、用户输入、功能入口、结果显示。
+- 成员2：Socket 通信、协议封装、状态码解析、RTT 检测。
+- 成员3：银行中央服务器框架、命令解析、登录状态管理、业务调度、响应封装、PING/PONG。
+- 成员4：SQLite 数据库、账户业务函数、交易流水、SMTP 邮件发送。
 
-系统主要实现用户登录、账户余额查询、取款、存款、交易流水查询等基本功能，并在此基础上扩展实现存取款后的 SMTP 邮件提醒功能，以及 ATM 客户端与服务器之间的 RTT 往返时延检测功能。
-
-项目由 ATM 客户端、银行中央服务器、数据库模块、SMTP 邮件模块和 RTT 网络检测模块组成。客户端通过 Socket 与服务器进行通信，服务器接收客户端请求后访问数据库，完成相应业务处理，并将结果返回给客户端。
-
----
-
-## 2. 项目功能
-
-### 2.1 基本功能
-
-| 功能 | 说明 |
-|---|---|
-| 用户登录 | 用户输入用户名和密码，服务器验证账户信息 |
-| 账户余额查询 | 用户登录后可以查询当前账户余额 |
-| 取款 | 用户输入取款金额，服务器判断余额是否充足并更新账户余额 |
-| 存款 | 用户输入存款金额，服务器更新账户余额 |
-| 交易流水查询 | 用户可以查询账户的交易记录 |
-| 客户端操作界面 | 提供简单的 ATM 操作菜单 |
-| 服务器业务处理 | 服务器接收并处理客户端请求 |
-| 数据存储 | 保存用户账户信息和交易流水记录 |
-
-### 2.2 扩展功能
-
-| 功能 | 说明 |
-|---|---|
-| SMTP 邮件提醒 | 存款或取款成功后，系统向用户邮箱发送确认邮件 |
-| RTT 检测 | ATM 客户端检测与服务器之间的往返时延 |
-| RTT 统计 | 统计最小 RTT、最大 RTT 和平均 RTT |
-| 系统测试 | 对登录、查询、取款、存款、流水查询、邮件和 RTT 进行测试 |
-
----
-
-## 3. 系统结构
+## 目录结构
 
 ```text
-用户
- ↓
-ATM 客户端
- ↓ TCP Socket 通信
-银行中央服务器
- ↓
-数据库
- ↓
-账户信息 / 交易流水
-
-银行中央服务器
- ↓
-SMTP 邮件模块
- ↓
-用户邮箱
+client/
+  atm_client.py              # 客户端入口
+  ui.py                      # 菜单、输入校验、结果显示
+  communication.py           # Socket 通信、协议封装、RTT 测试
+  communication_adapter.py   # 成员1加载成员2通信模块的适配器
+server/
+  bank_server.py             # 服务器启动、监听和客户端连接处理
+  command_handler.py         # 命令解析、登录状态、业务调度
+  response.py                # 状态码和响应报文封装
+  service_adapter.py         # 成员4数据库与邮件接口适配层
+database/
+  database.py                # SQLite 数据库连接
+  account_service.py         # 账户校验、余额变更、交易流水、邮箱查询
+  init_db.py                 # 数据库初始化脚本
+  atm.db                     # SQLite 数据库文件
+email_service/
+  smtp_email.py              # SMTP 邮件发送
+test/
+  test_member1_ui.py
+  test_communication.py
+  test_member3_server.py
+  test_member4_service.py
+docs/
+  configuration_usage.md
+  member2_communication_module.md
 ```
 
-系统主要模块如下：
+## 运行方式
 
-| 模块 | 作用 |
-|---|---|
-| ATM 客户端 | 负责用户界面、用户输入、功能选择和结果显示 |
-| 通信模块 | 负责客户端与服务器之间的 Socket 通信 |
-| 银行中央服务器 | 负责请求接收、命令解析、业务调度和响应返回 |
-| 数据库模块 | 负责账户信息和交易流水的存储与查询 |
-| SMTP 邮件模块 | 负责存款、取款成功后的邮件提醒 |
-| RTT 检测模块 | 负责客户端与服务器之间的网络往返时延检测 |
+在项目根目录执行：
 
----
+```powershell
+python database\init_db.py
+python server\bank_server.py
+```
 
-## 4. 技术说明
+新开一个终端，再执行：
 
-| 类型 | 内容 |
-|---|---|
-| 系统架构 | Client / Server 架构 |
-| 通信方式 | TCP Socket |
-| 通信协议 | 自定义 ATM 通信协议 |
-| 数据存储 | 数据库或文本文件 |
-| 邮件协议 | SMTP |
-| 主要功能 | 登录、查询、取款、存款、流水查询、邮件提醒、RTT 检测 |
-| 运行环境 | Windows / Linux / macOS |
+```powershell
+python client\atm_client.py
+```
 
----
+默认服务器地址为 `127.0.0.1:8888`。
 
-## 5. 通信协议设计
+## 通信协议
 
-### 5.1 客户端请求格式
-
-客户端向服务器发送请求时，采用如下统一格式：
+客户端请求：
 
 ```text
-COMMAND [data]
+HELO username
+PASS password
+BALA
+WITHDRAW amount
+DEPOSIT amount
+FLOW
+PING
+QUIT
 ```
 
-其中：
-
-- `COMMAND` 表示客户端请求命令；
-- `[data]` 表示可选数据，例如用户名、密码、金额等；
-- 命令和数据之间使用空格分隔。
-
-### 5.2 客户端请求命令
-
-| 命令 | 含义 | 示例 |
-|---|---|---|
-| HELO | 发送用户名 | HELO zhangsan |
-| PASS | 发送密码 | PASS 123456 |
-| BALA | 查询账户余额 | BALA |
-| WITHDRAW | 取款 | WITHDRAW 500 |
-| DEPOSIT | 存款 | DEPOSIT 300 |
-| FLOW | 查询交易流水 | FLOW |
-| PING | RTT 往返时延检测 | PING |
-| QUIT | 退出系统 | QUIT |
-
-### 5.3 服务器响应格式
-
-服务器向客户端返回响应时，采用如下统一格式：
+所有请求和响应均使用 UTF-8 编码，并以 `\n` 结尾。服务器响应格式为：
 
 ```text
 StatusCode StatusPhrase Data
 ```
 
-其中：
+`PING` 会立即返回 `PONG`，成员2只将 `PONG` 作为有效 RTT 响应。
 
-- `StatusCode` 表示状态码；
-- `StatusPhrase` 表示状态说明；
-- `Data` 表示服务器返回的数据内容。
+## 测试账号
 
-### 5.4 服务器状态码
+| 用户名 | 密码 | 初始余额 | 邮箱 |
+| --- | --- | ---: | --- |
+| zhangsan | 123456 | 5000.00 | zhangsan@qq.com |
+| lisi | 123456 | 3000.00 | lisi@qq.com |
+| admin | 123456 | 10000.00 | admin@qq.com |
 
-| 状态码 | 含义 | 示例 |
-|---|---|---|
-| 200 | 登录成功或请求成功 | 200 OK Login success |
-| 201 | 查询成功 | 201 OK Balance: 5000.00 RMB |
-| 202 | 取款成功 | 202 OK Withdraw success |
-| 203 | 存款成功 | 203 OK Deposit success |
-| 204 | 流水查询成功 | 204 OK Flow query success |
-| 300 | 退出成功 | 300 OK Quit success |
-| 400 | 密码错误 | 400 ERROR Wrong password |
-| 401 | 用户不存在 | 401 ERROR User not found |
-| 402 | 余额不足 | 402 ERROR Insufficient balance |
-| 403 | 非法金额 | 403 ERROR Invalid amount |
-| 404 | 未登录 | 404 ERROR Please login first |
-| 500 | 服务器错误 | 500 ERROR Server error |
+## SMTP 配置
 
----
+邮件发送配置通过环境变量读取。未配置、配置错误或发送失败时，`send_email()` 返回 `False`，不影响存款和取款主流程。
 
-## 6. 主要业务流程
+```powershell
+$env:ATM_SMTP_HOST="smtp.qq.com"
+$env:ATM_SMTP_PORT="465"
+$env:ATM_SMTP_USER="your@qq.com"
+$env:ATM_SMTP_PASSWORD="smtp_authorization_code"
+$env:ATM_SMTP_FROM="your@qq.com"
+$env:ATM_SMTP_SSL="true"
+```
 
-### 6.1 登录流程
+## 测试
+
+```powershell
+python -m unittest discover -s test -v
+```
+
+测试覆盖客户端界面、Socket 通信、服务器命令处理、数据库账户业务、交易流水和 SMTP 异常处理。
+
+## 详细配置与使用
+
+完整运行配置、SMTP 设置、现场演示流程和常见问题见：
 
 ```text
-用户输入用户名和密码
- ↓
-客户端发送 HELO username
- ↓
-客户端发送 PASS password
- ↓
-服务器查询数据库
- ↓
-服务器验证用户名和密码
- ↓
-服务器返回登录结果
- ↓
-客户端显示登录成功或失败
+docs/configuration_usage.md
 ```
-
-登录成功示例：
-
-```text
-Client: HELO zhangsan
-Server: 200 OK User exists
-
-Client: PASS 123456
-Server: 200 OK Login success
-```
-
-登录失败示例：
-
-```text
-Client: HELO zhangsan
-Server: 200 OK User exists
-
-Client: PASS 000000
-Server: 400 ERROR Wrong password
-```
-
----
-
-### 6.2 余额查询流程
-
-```text
-用户选择余额查询
- ↓
-客户端发送 BALA
- ↓
-服务器判断用户是否已经登录
- ↓
-服务器查询数据库中的账户余额
- ↓
-服务器返回余额信息
- ↓
-客户端显示账户余额
-```
-
-示例：
-
-```text
-Client: BALA
-Server: 201 OK Balance: 5000.00 RMB
-```
-
----
-
-### 6.3 取款流程
-
-```text
-用户输入取款金额
- ↓
-客户端检查金额是否合法
- ↓
-客户端发送 WITHDRAW amount
- ↓
-服务器判断用户是否已经登录
- ↓
-服务器判断取款金额是否合法
- ↓
-服务器查询账户余额
- ↓
-服务器判断余额是否充足
- ↓
-服务器扣除账户余额
- ↓
-服务器记录交易流水
- ↓
-服务器发送取款确认邮件
- ↓
-服务器返回取款结果
- ↓
-客户端显示操作结果
-```
-
-取款成功示例：
-
-```text
-Client: WITHDRAW 500
-Server: 202 OK Withdraw success, Balance: 4500.00 RMB
-```
-
-余额不足示例：
-
-```text
-Client: WITHDRAW 999999
-Server: 402 ERROR Insufficient balance
-```
-
----
-
-### 6.4 存款流程
-
-```text
-用户输入存款金额
- ↓
-客户端检查金额是否合法
- ↓
-客户端发送 DEPOSIT amount
- ↓
-服务器判断用户是否已经登录
- ↓
-服务器判断存款金额是否合法
- ↓
-服务器增加账户余额
- ↓
-服务器记录交易流水
- ↓
-服务器发送存款确认邮件
- ↓
-服务器返回存款结果
- ↓
-客户端显示操作结果
-```
-
-示例：
-
-```text
-Client: DEPOSIT 300
-Server: 203 OK Deposit success, Balance: 5300.00 RMB
-```
-
----
-
-### 6.5 交易流水查询流程
-
-```text
-用户选择交易流水查询
- ↓
-客户端发送 FLOW
- ↓
-服务器判断用户是否已经登录
- ↓
-服务器查询交易流水表
- ↓
-服务器返回交易记录
- ↓
-客户端显示交易流水
-```
-
-示例：
-
-```text
-Client: FLOW
-Server: 204 OK Flow query success
-```
-
----
-
-### 6.6 RTT 检测流程
-
-```text
-用户选择 RTT 测试
- ↓
-客户端记录发送时间
- ↓
-客户端发送 PING
- ↓
-服务器收到 PING 后立即返回 PONG
- ↓
-客户端记录接收时间
- ↓
-客户端计算 RTT
- ↓
-多次测试后统计最小值、最大值和平均值
- ↓
-客户端显示 RTT 测试结果
-```
-
-示例：
-
-```text
-Client: PING
-Server: PONG
-```
-
-RTT 结果示例：
-
-```text
-RTT Test Result:
-Test Times: 5
-Min RTT: 12 ms
-Max RTT: 25 ms
-Average RTT: 17 ms
-Network Status: Good
-```
-
----
-
-## 7. 数据库设计
-
-### 7.1 账户信息表
-
-表名：`account`
-
-| 字段名 | 类型示例 | 含义 |
-|---|---|---|
-| id | int | 用户编号 |
-| username | varchar | 用户名 |
-| password | varchar | 密码 |
-| balance | decimal | 账户余额 |
-| email | varchar | 用户邮箱 |
-| status | int | 账户状态 |
-
-示例数据：
-
-| id | username | password | balance | email | status |
-|---|---|---|---|---|---|
-| 1 | zhangsan | 123456 | 5000.00 | zhangsan@qq.com | 1 |
-| 2 | lisi | 123456 | 3000.00 | lisi@qq.com | 1 |
-| 3 | admin | 123456 | 10000.00 | admin@qq.com | 1 |
-
----
-
-### 7.2 交易流水表
-
-表名：`transaction_flow`
-
-| 字段名 | 类型示例 | 含义 |
-|---|---|---|
-| id | int | 流水编号 |
-| username | varchar | 用户名 |
-| type | varchar | 交易类型 |
-| amount | decimal | 交易金额 |
-| balance_after | decimal | 交易后余额 |
-| create_time | datetime | 交易时间 |
-| remark | varchar | 备注 |
-
-交易类型包括：
-
-```text
-LOGIN
-BALANCE_QUERY
-WITHDRAW
-DEPOSIT
-FLOW_QUERY
-```
-
----
-
-## 8. 项目目录结构
-
-```text
-ATM-Banking-System/
-│
-├── client/
-│   ├── atm_client.py
-│   ├── ui.py
-│   └── communication.py
-│
-├── server/
-│   ├── bank_server.py
-│   ├── command_handler.py
-│   └── response.py
-│
-├── database/
-│   ├── database.py
-│   ├── init.sql
-│   └── account_service.py
-│
-├── email/
-│   └── smtp_email.py
-│
-├── test/
-│   ├── test_login.py
-│   ├── test_transaction.py
-│   └── test_rtt.py
-│
-├── docs/
-│   ├── project_report.docx
-│   └── screenshots/
-│
-├── README.md
-└── requirements.txt
-```
-
-说明：
-
-| 目录 / 文件 | 作用 |
-|---|---|
-| client/ | 存放 ATM 客户端相关代码 |
-| server/ | 存放银行中央服务器相关代码 |
-| database/ | 存放数据库连接、建表 SQL 和账户业务代码 |
-| email/ | 存放 SMTP 邮件发送代码 |
-| test/ | 存放测试代码或测试记录 |
-| docs/ | 存放项目文档和运行截图 |
-| README.md | 项目说明文件 |
-| requirements.txt | 项目依赖文件 |
-
----
-
-## 9. 运行方法
-
-### 9.1 克隆项目
-
-```bash
-git clone https://github.com/your-username/ATM-Banking-System.git
-cd ATM-Banking-System
-```
-
-### 9.2 安装依赖
-
-如果项目使用 Python，可以执行：
-
-```bash
-pip install -r requirements.txt
-```
-
-如果没有使用第三方依赖，可以跳过此步骤。
-
-### 9.3 初始化数据库
-
-如果使用 MySQL，可以执行：
-
-```bash
-cd database
-mysql -u root -p < init.sql
-```
-
-如果使用 SQLite 或文本文件存储数据，请根据实际项目代码运行初始化脚本。
-
-### 9.4 启动服务器
-
-```bash
-cd server
-python bank_server.py
-```
-
-服务器启动后，等待 ATM 客户端连接。
-
-### 9.5 启动客户端
-
-打开新的终端窗口，执行：
-
-```bash
-cd client
-python atm_client.py
-```
-
-客户端启动后，根据菜单提示完成登录、查询、取款、存款、流水查询和 RTT 测试。
-
----
-
-## 10. SMTP 邮件提醒说明
-
-系统在用户存款或取款成功后发送确认邮件。
-
-### 10.1 取款邮件示例
-
-```text
-Subject: Bank ATM Withdraw Notice
-
-尊敬的用户，您的账户刚刚完成一笔取款操作。
-
-取款金额：500 RMB
-当前余额：4500 RMB
-
-如非本人操作，请及时联系银行。
-```
-
-### 10.2 存款邮件示例
-
-```text
-Subject: Bank ATM Deposit Notice
-
-尊敬的用户，您的账户刚刚完成一笔存款操作。
-
-存款金额：300 RMB
-当前余额：5300 RMB
-
-感谢您使用本 ATM 系统。
-```
-
-### 10.3 邮件配置说明
-
-使用 SMTP 邮件功能时，需要配置：
-
-| 配置项 | 说明 |
-|---|---|
-| SMTP 服务器地址 | 例如 smtp.qq.com、smtp.163.com |
-| SMTP 端口 | 常用端口为 465 或 587 |
-| 发件人邮箱 | 用于发送提醒邮件的邮箱 |
-| 邮箱授权码 | 邮箱开启 SMTP 服务后生成的授权码 |
-| 收件人邮箱 | 用户账户表中保存的邮箱地址 |
-
----
-
-## 11. 测试说明
-
-系统主要测试以下内容：
-
-| 测试编号 | 测试功能 | 测试内容 | 预期结果 |
-|---|---|---|---|
-| T01 | 登录测试 | 输入正确用户名和密码 | 登录成功 |
-| T02 | 登录失败测试 | 输入错误密码 | 提示密码错误 |
-| T03 | 用户不存在测试 | 输入不存在的用户名 | 提示用户不存在 |
-| T04 | 余额查询测试 | 登录后查询账户余额 | 返回当前账户余额 |
-| T05 | 取款成功测试 | 输入合法金额且余额充足 | 取款成功，余额减少 |
-| T06 | 取款失败测试 | 输入金额大于账户余额 | 提示余额不足 |
-| T07 | 非法金额测试 | 输入 0、负数或非数字金额 | 提示金额非法 |
-| T08 | 存款测试 | 输入合法存款金额 | 存款成功，余额增加 |
-| T09 | 流水查询测试 | 查询账户交易流水 | 显示交易记录 |
-| T10 | SMTP 邮件测试 | 存款或取款成功 | 收到确认邮件 |
-| T11 | RTT 测试 | 发送 PING 请求 | 返回 RTT 统计结果 |
-| T12 | 退出测试 | 选择退出系统 | 客户端正常退出 |
-
----
-
-## 12. 成员分工
-
-本项目由六名成员共同完成，按照工作内容分为编程成员和文档成员。其中，成员1、成员2、成员3、成员4主要负责系统代码实现，成员5和成员6主要负责项目设计文档撰写、测试材料整理和演示内容整理。
-
-| 成员 | 工作类型 | 具体分工 |
-|---|---|---|
-| 成员1 | 编程 | 负责 ATM 客户端界面与用户操作模块，包括登录界面、主菜单、余额查询入口、取款入口、存款入口、流水查询入口、RTT 测试入口、退出功能、用户输入合法性检查以及服务器返回结果显示。 |
-| 成员2 | 编程 | 负责客户端与服务器之间的通信模块，包括 Socket 连接、请求报文封装、服务器响应接收、状态码解析、通信异常处理，以及 PING/PONG 方式的 RTT 往返时延检测和统计。 |
-| 成员3 | 编程 | 负责银行中央服务器端程序，包括服务器启动、端口监听、客户端请求接收、命令解析、登录状态管理、业务函数调用、服务器响应封装，以及 PING 请求的快速响应。 |
-| 成员4 | 编程 | 负责数据库和账户业务模块，包括账户信息表、交易流水表、数据库连接、用户验证、余额查询、存取款余额更新、交易流水记录、用户邮箱查询，以及存款和取款成功后的 SMTP 邮件提醒。 |
-| 成员5 | 文档 | 负责项目设计文档前半部分，包括引言、项目背景、团队分工、需求描述、设计方法和开发工具、系统运行环境、接口需求分析、系统总体结构、系统详细界面、通信协议、状态码、流程图和最终格式统一。 |
-| 成员6 | 文档 | 负责项目设计文档后半部分，包括服务器程序设计思路、ATM 客户端程序设计思路、核心源代码整理、数据库设计说明、SMTP 邮件提醒说明、RTT 延迟检测说明、测试计划、测试用例、测试效果、运行截图和现场演示材料。 |
-
----
-
-## 13. 成员之间的衔接关系
-
-### 13.1 客户端部分
-
-```text
-成员1负责用户界面和输入
- ↓
-成员2负责将用户操作封装成通信请求
- ↓
-服务器返回结果后，成员2解析响应
- ↓
-成员1将结果显示给用户
-```
-
-### 13.2 服务器部分
-
-```text
-成员3负责服务器监听、请求接收和命令解析
- ↓
-成员3根据命令调用成员4提供的数据库和业务函数
- ↓
-成员4完成数据库查询、余额修改、流水记录和邮件发送
- ↓
-成员3封装服务器响应并返回客户端
-```
-
-### 13.3 文档部分
-
-```text
-成员1、2、3、4提供代码、截图、运行结果和功能说明
- ↓
-成员5整理文档前半部分、协议表、流程图和格式
- ↓
-成员6整理文档后半部分、代码说明、数据库说明和测试材料
- ↓
-最终形成完整项目设计文档和演示材料
-```
-
----
-
-## 14. 项目特点
-
-- 采用客户端 / 服务器架构；
-- 使用 Socket 实现 ATM 与银行服务器之间的通信；
-- 设计自定义 ATM 通信协议；
-- 支持登录、余额查询、取款、存款和交易流水查询；
-- 使用数据库或文本文件保存账户信息和交易流水；
-- 支持存款、取款后的 SMTP 邮件确认；
-- 支持 RTT 往返时延检测和统计分析；
-- 包含较完整的测试计划和运行效果展示；
-- 成员分工明确，代码工作和文档工作分离。
-
----
-
-## 15. 注意事项
-
-1. 运行客户端前，需要先启动服务器。
-2. 数据库或文本数据文件需要提前初始化。
-3. 测试账号仅用于课程实验，不应作为真实银行账户使用。
-4. SMTP 邮件功能需要正确配置邮箱服务器、邮箱账号和授权码。
-5. 如果修改通信协议，客户端和服务器需要同步修改。
-6. 测试 RTT 功能时，需要保证客户端和服务器连接正常。
-7. 本项目仅用于课程实验和学习交流，不具备真实银行系统的安全性和完整性。
-
-本项目不应用于真实银行业务场景。
