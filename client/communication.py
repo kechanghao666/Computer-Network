@@ -283,6 +283,7 @@ class AtmCommunication:
                     raise CommunicationError("服务器连接已断开")
                 self._recv_buffer += data.decode(ENCODING)
         except socket.timeout as exc:
+            self.close_connection()
             raise CommunicationError("接收响应超时") from exc
         except UnicodeDecodeError as exc:
             raise CommunicationError("服务器响应不是 UTF-8 编码") from exc

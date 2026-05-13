@@ -3,6 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
+import email_service.smtp_email as smtp_email
 from database.account_service import (
     add_flow,
     check_password,
@@ -43,7 +44,7 @@ class Member4ServiceTest(unittest.TestCase):
         self.assertTrue(check_user("lisi", self.db_path))
         self.assertTrue(check_user("admin", self.db_path))
         self.assertEqual(get_balance("zhangsan", self.db_path, record_flow=False), 5000.0)
-        self.assertEqual(get_email("lisi", self.db_path), "lisi@qq.com")
+        self.assertEqual(get_email("lisi", self.db_path), "demo@example.com")
 
     def test_check_password_validates_existing_user_password(self):
         self.assertTrue(check_password("zhangsan", "123456", self.db_path))
@@ -176,24 +177,17 @@ class Member4ServiceTest(unittest.TestCase):
                 os.environ["ATM_SMTP_PORT"] = old_port
 
     def test_smtp_config_status_reports_missing_items(self):
-        old_values = {key: os.environ.get(key) for key in (
-            "ATM_SMTP_HOST",
-            "ATM_SMTP_PORT",
-            "ATM_SMTP_USER",
-            "ATM_SMTP_PASSWORD",
-            "ATM_SMTP_FROM",
-        )}
-        for key in old_values:
-            os.environ.pop(key, None)
+        old_get_env = smtp_email._get_env
+        smtp_email._get_env = (
+            lambda name, default=None: default if name == "ATM_SMTP_PORT" else None
+        )
         try:
             status = get_smtp_config_status()
             self.assertFalse(status["configured"])
             self.assertIn("ATM_SMTP_HOST", status["missing"])
             self.assertIn("ATM_SMTP_PASSWORD", status["missing"])
         finally:
-            for key, value in old_values.items():
-                if value is not None:
-                    os.environ[key] = value
+            smtp_email._get_env = old_get_env
 
     def test_send_test_email_uses_same_sender_path(self):
         sender = RecordingEmailSender()

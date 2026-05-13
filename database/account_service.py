@@ -1,5 +1,6 @@
 import csv
 import json
+import os
 from datetime import datetime
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from contextlib import closing
@@ -12,11 +13,25 @@ except ImportError:
 
 
 MONEY_QUANT = Decimal("0.01")
-SEED_ACCOUNTS = (
-    ("zhangsan", "123456", 5000.00, "zhangsan@qq.com", 1),
-    ("lisi", "123456", 3000.00, "lisi@qq.com", 1),
-    ("admin", "123456", 10000.00, "admin@qq.com", 1),
-)
+DEFAULT_DEMO_EMAIL = "demo@example.com"
+SEED_USERNAMES = ("zhangsan", "lisi", "admin")
+
+
+def _configured_demo_email():
+    return _get_env("ATM_DEMO_EMAIL")
+
+
+def _demo_email():
+    return _configured_demo_email() or DEFAULT_DEMO_EMAIL
+
+
+def _seed_accounts():
+    email = _demo_email()
+    return (
+        ("zhangsan", "123456", 5000.00, email, 1),
+        ("lisi", "123456", 3000.00, email, 1),
+        ("admin", "123456", 10000.00, email, 1),
+    )
 
 
 def init_database(db_path=DEFAULT_DB_PATH):
@@ -72,8 +87,18 @@ def init_database(db_path=DEFAULT_DB_PATH):
                     (username, password, balance, email, status)
                 VALUES (?, ?, ?, ?, ?)
                 """,
-                SEED_ACCOUNTS,
+                _seed_accounts(),
             )
+            configured_email = _configured_demo_email()
+            if configured_email:
+                connection.execute(
+                    """
+                    UPDATE account
+                    SET email = ?
+                    WHERE username IN (?, ?, ?)
+                    """,
+                    (configured_email, *SEED_USERNAMES),
+                )
 
 
 def check_user(username, db_path=DEFAULT_DB_PATH):
@@ -417,3 +442,19 @@ def _result(success, status_code, message, balance=None):
         "message": message,
         "balance": None if balance is None else _float_money(balance),
     }
+
+
+def _get_env(name, default=None):
+    value = os.getenv(name)
+    if value is not None:
+        return value
+    if os.name == "nt":
+        try:
+            import winreg
+
+            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, "Environment") as key:
+                value, _ = winreg.QueryValueEx(key, name)
+                return value
+        except OSError:
+            pass
+    return default

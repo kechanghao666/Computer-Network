@@ -19,12 +19,12 @@ class SmtpEmailSender:
         use_ssl=None,
         timeout=10,
     ):
-        self.host = host or os.getenv("ATM_SMTP_HOST")
-        self.port_raw = str(port or os.getenv("ATM_SMTP_PORT", "465")).strip()
+        self.host = host or _get_env("ATM_SMTP_HOST")
+        self.port_raw = str(port or _get_env("ATM_SMTP_PORT", "465")).strip()
         self.port = _parse_port(self.port_raw)
-        self.username = username or os.getenv("ATM_SMTP_USER")
-        self.password = password or os.getenv("ATM_SMTP_PASSWORD")
-        self.from_email = from_email or os.getenv("ATM_SMTP_FROM") or self.username
+        self.username = username or _get_env("ATM_SMTP_USER")
+        self.password = password or _get_env("ATM_SMTP_PASSWORD")
+        self.from_email = from_email or _get_env("ATM_SMTP_FROM") or self.username
         self.use_ssl = _env_bool("ATM_SMTP_SSL", True) if use_ssl is None else use_ssl
         self.timeout = timeout
 
@@ -112,10 +112,26 @@ def _parse_port(value):
 
 
 def _env_bool(name, default):
-    value = os.getenv(name)
+    value = _get_env(name)
     if value is None:
         return default
     return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _get_env(name, default=None):
+    value = os.getenv(name)
+    if value is not None:
+        return value
+    if os.name == "nt":
+        try:
+            import winreg
+
+            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, "Environment") as key:
+                value, _ = winreg.QueryValueEx(key, name)
+                return value
+        except OSError:
+            pass
+    return default
 
 
 def main(argv=None):

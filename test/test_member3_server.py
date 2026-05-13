@@ -8,7 +8,7 @@ from server.command_handler import CommandHandler
 class FakeAccountService:
     def __init__(self) -> None:
         self.accounts = {
-            "zhangsan": {"password": "123456", "balance": 5000.0, "email": "zhangsan@qq.com"},
+            "zhangsan": {"password": "123456", "balance": 5000.0, "email": "demo@example.com"},
         }
         self.flows = []
 
@@ -89,11 +89,12 @@ class Member3ServerTest(unittest.TestCase):
         withdraw_response = self.handler.handle_request("WITHDRAW 500").response
         self.assertIn("202 OK Withdraw success", withdraw_response)
         self.assertIn("Balance: 4500.00 RMB", withdraw_response)
-        self.assertIn("Email Notice: Sent", withdraw_response)
+        self.assertIn("Email Notice: Queued", withdraw_response)
 
         deposit_response = self.handler.handle_request("DEPOSIT 300").response
         self.assertIn("203 OK Deposit success", deposit_response)
         self.assertIn("Balance: 4800.00 RMB", deposit_response)
+        self.assertIn("Email Notice: Queued", deposit_response)
 
     def test_invalid_and_insufficient_amount(self) -> None:
         self.login()

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import threading
 from typing import Any
 
 from server.response import build_response, format_money
@@ -217,14 +218,26 @@ class CommandHandler:
         return None
 
     def _send_transaction_email(self, username: str, subject: str, content: str) -> str:
-        """邮件发送失败不影响已经完成的存取款操作。"""
+        """后台发送邮件，避免 SMTP 网络问题阻塞 ATM 响应。"""
         try:
             to_email = self.service.get_email(username)
             if not to_email:
                 return "No email"
-            return "Sent" if self.service.send_email(to_email, subject, content) else "Failed"
         except Exception:
             return "Failed"
+
+        threading.Thread(
+            target=self._send_email_safely,
+            args=(to_email, subject, content),
+            daemon=True,
+        ).start()
+        return "Queued"
+
+    def _send_email_safely(self, to_email: str, subject: str, content: str) -> None:
+        try:
+            self.service.send_email(to_email, subject, content)
+        except Exception:
+            pass
 
     @staticmethod
     def _format_flow_records(records: Any) -> str:

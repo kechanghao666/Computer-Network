@@ -20,19 +20,19 @@ class InMemoryAccountService:
             "zhangsan": {
                 "password": "123456",
                 "balance": 5000.0,
-                "email": "zhangsan@qq.com",
+                "email": "demo@example.com",
                 "status": 1,
             },
             "lisi": {
                 "password": "123456",
                 "balance": 3000.0,
-                "email": "lisi@qq.com",
+                "email": "demo@example.com",
                 "status": 1,
             },
             "admin": {
                 "password": "123456",
                 "balance": 10000.0,
-                "email": "admin@qq.com",
+                "email": "demo@example.com",
                 "status": 1,
             },
         }
