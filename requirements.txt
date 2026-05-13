@@ -1,0 +1,2 @@
+# This project only uses Python standard-library modules:
+# socket, sqlite3, smtplib, email, tkinter, unittest.

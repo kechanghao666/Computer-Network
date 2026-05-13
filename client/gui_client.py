@@ -94,12 +94,14 @@ class AtmGuiApp:
         self._append("GUI client ready. Start server first, then click Connect.\n")
 
     def connect(self) -> None:
+        host = self.host_var.get().strip() or "127.0.0.1"
+        try:
+            port = int(self.port_var.get().strip())
+        except ValueError:
+            messagebox.showerror("Connect", "Port must be a number.")
+            return
+
         def task() -> str:
-            host = self.host_var.get().strip() or "127.0.0.1"
-            try:
-                port = int(self.port_var.get().strip())
-            except ValueError as exc:
-                raise ValueError("Port must be a number.") from exc
             client = AtmCommunication(host=host, port=port)
             client.connect_server()
             self.client = client
@@ -108,12 +110,14 @@ class AtmGuiApp:
         self._run_task("Connect", task, self._set_connected)
 
     def login(self) -> None:
+        username = self.username_var.get().strip()
+        password = self.password_var.get().strip()
+        if not username or not password:
+            messagebox.showerror("Login", "Username and password cannot be empty.")
+            return
+
         def task():
             client = self._require_client()
-            username = self.username_var.get().strip()
-            password = self.password_var.get().strip()
-            if not username or not password:
-                raise ValueError("Username and password cannot be empty.")
             response = client.login(username, password)
             if response.is_success:
                 self.username = username
@@ -125,10 +129,16 @@ class AtmGuiApp:
         self._run_task("Balance", lambda: self._require_client().query_balance().raw)
 
     def withdraw(self) -> None:
-        self._run_task("Withdraw", lambda: self._require_client().withdraw(self._amount()).raw)
+        amount = self._amount_or_none()
+        if amount is None:
+            return
+        self._run_task("Withdraw", lambda: self._require_client().withdraw(amount).raw)
 
     def deposit(self) -> None:
-        self._run_task("Deposit", lambda: self._require_client().deposit(self._amount()).raw)
+        amount = self._amount_or_none()
+        if amount is None:
+            return
+        self._run_task("Deposit", lambda: self._require_client().deposit(amount).raw)
 
     def query_flow(self) -> None:
         self._run_task("Flow", lambda: self._require_client().query_flow().raw)
@@ -175,10 +185,11 @@ class AtmGuiApp:
             raise CommunicationError("Please connect to server first.")
         return self.client
 
-    def _amount(self) -> str:
+    def _amount_or_none(self) -> str | None:
         amount = self.amount_var.get().strip()
         if not amount:
-            raise ValueError("Amount cannot be empty.")
+            messagebox.showerror("Amount", "Amount cannot be empty.")
+            return None
         return amount
 
     def _run_task(
