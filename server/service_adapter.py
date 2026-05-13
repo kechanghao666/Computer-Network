@@ -96,7 +96,11 @@ class AccountServiceAdapter:
     @staticmethod
     def _load_account_backend() -> Any:
         try:
-            return import_module("database.account_service")
+            module = import_module("database.account_service")
+            init_database = getattr(module, "init_database", None)
+            if init_database is not None:
+                init_database()
+            return module
         except ModuleNotFoundError:
             return InMemoryAccountService()
 
