@@ -4,6 +4,7 @@ import unittest
 from pathlib import Path
 
 import email_service.smtp_email as smtp_email
+import database.account_service as account_service
 from database.account_service import (
     add_flow,
     check_password,
@@ -34,9 +35,14 @@ class Member4ServiceTest(unittest.TestCase):
     def setUp(self):
         self.temp_dir = tempfile.TemporaryDirectory()
         self.db_path = Path(self.temp_dir.name) / "atm.db"
+        self.old_account_get_env = account_service._get_env
+        account_service._get_env = (
+            lambda name, default=None: None if name == "ATM_DEMO_EMAIL" else self.old_account_get_env(name, default)
+        )
         init_database(self.db_path)
 
     def tearDown(self):
+        account_service._get_env = self.old_account_get_env
         self.temp_dir.cleanup()
 
     def test_init_database_creates_tables_and_seed_accounts(self):

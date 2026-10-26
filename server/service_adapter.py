@@ -87,7 +87,7 @@ class InMemoryAccountService:
 
 
 class AccountServiceAdapter:
-    """统一封装成员4提供的账户函数和邮件函数。"""
+    """统一封装账户函数和邮件函数。"""
 
     def __init__(self, backend: Any | None = None, email_sender: Any | None = None) -> None:
         self.backend = backend if backend is not None else self._load_account_backend()
